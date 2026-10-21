@@ -684,7 +684,7 @@ def create_workbook(
         "Test ID", "Test Name", "Line Number", "Feature", "Scenario",
         "Line Type", "Keyword", "Text",
     ]
-    script_headers = ["Test ID", "Test Name", "Test Type", "Script", "Script Error"]
+    script_headers = ["Test ID", "Test Name", "Description", "Test Type", "Script", "Script Error"]
     log_headers = ["Timestamp UTC", "Level", "Event", "Details"]
 
     ws = wb.create_sheet("Test Inventory")
@@ -757,15 +757,19 @@ def main() -> int:
             for test in tests:
                 test_id = test.get("id", "")
                 name = extract_test_name(test)
+                missing_name = not name
+                missing_description = not test.get("description")
 
-                if test_id not in ("", None) and not name:
+                if test_id not in ("", None) and (missing_name or missing_description):
                     try:
                         details = client.get_test_details(test_id)
                         test.update({k: v for k, v in details.items() if v is not None})
                         name = extract_test_name(test)
-                        if name:
+                        if (missing_name and name) or (
+                            missing_description and test.get("description")
+                        ):
                             LOGGER.info(
-                                "Hydrated missing name for %s test %s via /tests/%s",
+                                "Hydrated missing details for %s test %s via /tests/%s",
                                 test_type, test_id, test_id,
                             )
                     except OctaneAPIError as exc:
@@ -788,6 +792,7 @@ def main() -> int:
                         f"{test_type} test ID {test_id or '<missing ID>'}; "
                         f"response fields: {keys or '<none>'}",
                     )
+                description = test.get("description", "")
 
                 if test_id in ("", None):
                     inventory_row["Script Retrieved"] = "No"
@@ -805,6 +810,7 @@ def main() -> int:
                 raw_scripts.append({
                     "Test ID": test_id,
                     "Test Name": name,
+                    "Description": description,
                     "Test Type": test_type,
                     "Script": script,
                     "Script Error": script_error,
